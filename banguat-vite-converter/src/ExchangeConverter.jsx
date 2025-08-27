@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
 
-const API_BASE_URL = 'http://localhost:3000'; // La URL base de tu API REST de Node.js
+// --- MODIFICACIÓN CLAVE AQUÍ ---
+const API_BASE_URL = process.env.NODE_ENV === 'production'
+  ? 'https://converterbackend-vv81.onrender.com' // URL para producción
+  : 'http://localhost:3000';                   // URL para desarrollo local
+// ------------------------------------
 
 function ExchangeConverter() {
     const [exchangeRateData, setExchangeRateData] = useState(null); // Objeto: { fecha, valor }

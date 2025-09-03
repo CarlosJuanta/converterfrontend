@@ -1,49 +1,54 @@
-import React, {useState} from 'react';
+// src/Login.jsx
+import React, { useState } from 'react';
 
-// Se reutiliza la misma variable de entorno para la URL del backend
 const API_BASE_URL = process.env.NODE_ENV === 'production'
   ? 'https://converterbackend-vv81.onrender.com'
   : 'http://localhost:3000';
 
+function Login({ onLoginSuccess }) {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-  function Login ({onLoginSuccess}) {
-     const [username, setUsername] = useState ('');
-     const [password, setPassword] = useState ('');
-     const [error, setError] = useState (null);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError(null);
+    setIsLoading(true);
 
-
-     const handleSubmit = async (e) => {
-        e.preventDefault();
-        setError(null);
-
-        try {
-        const response = await fetch (`${API_BASE_URL}/api/v1/auth/login`, {
-        method: 'POST' ,
-        headers : {
-            'Content-type' : 'application/json',
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ username, password}),
-        // ¡¡ESTA LÍNEA ES LA MÁS IMPORTANTE PARA LA AUTENTICACIÓN!!
-        // Le dice al navegador que envíe las cookies que reciba del backend.
+        body: JSON.stringify({ username, password }),
         credentials: 'include',
-        });
-        
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.message || 'Error al iniciar sesión.' );
-        }
-          
-         // Si el login es exitoso, llamamos a la función que nos pasó el padre (App.jsx)
-      onLoginSuccess();
+      });
 
-        } catch (err) {
-            setError(err.message);
-        }
-     };
+      const data = await response.json();
 
+      if (!response.ok) {
+        throw new Error(data.message || 'Error desconocido al iniciar sesión.');
+      }
+      
+      // Si el login es exitoso, llamamos a la función del padre
+      // y le pasamos el timestamp de expiración que nos dio el backend.
+      if (data.expiresAt) {
+        onLoginSuccess(data.expiresAt);
+      } else {
+        throw new Error("La respuesta del servidor no incluyó la fecha de expiración.");
+      }
 
-     return (
-      <div style={styles.container}>
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div style={styles.container}>
       <h1 style={styles.title}>Iniciar Sesión</h1>
       <form onSubmit={handleSubmit}>
         <div style={styles.inputGroup}>
@@ -55,6 +60,7 @@ const API_BASE_URL = process.env.NODE_ENV === 'production'
             onChange={(e) => setUsername(e.target.value)}
             required
             style={styles.input}
+            disabled={isLoading}
           />
         </div>
         <div style={styles.inputGroup}>
@@ -66,19 +72,18 @@ const API_BASE_URL = process.env.NODE_ENV === 'production'
             onChange={(e) => setPassword(e.target.value)}
             required
             style={styles.input}
+            disabled={isLoading}
           />
         </div>
         {error && <p style={styles.error}>{error}</p>}
-        <button type="submit" style={styles.button}>Entrar</button>
+        <button type="submit" style={styles.button} disabled={isLoading}>
+          {isLoading ? 'Entrando...' : 'Entrar'}
+        </button>
       </form>
     </div>
   );
-    
+}
 
-  } 
-
-
-  // Estilos para el componente (puedes personalizarlos)
 const styles = {
     container: { fontFamily: 'Arial, sans-serif', maxWidth: '400px', margin: '50px auto', padding: '20px', border: '1px solid #ddd', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', textAlign: 'center' },
     title: { color: '#333', fontSize: '24px' },

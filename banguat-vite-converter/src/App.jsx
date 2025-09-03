@@ -1,73 +1,131 @@
 // src/App.jsx
-import { useState, useEffect } from 'react'; // <-- Importamos useEffect
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Routes, Route, useNavigate, Navigate } from 'react-router-dom';
 import ExchangeConverter from './ExchangeConverter';
 import Login from './Login';
+import WarningModal from './WarningModal';
+import './App.css';
 
-
-// Reutilizamos la variable de entorno aquí también
 const API_BASE_URL = process.env.NODE_ENV === 'production'
   ? 'https://converterbackend-vv81.onrender.com'
   : 'http://localhost:3000';
 
+// ===================================================================
+// COMPONENTE "GUARDIA DE SEGURIDAD" PARA LAS RUTAS
+// ===================================================================
+function ProtectedRoute({ isAuthenticated, children }) {
+  if (!isAuthenticated) {
+    // Si el usuario no está autenticado, lo redirigimos a /login
+    return <Navigate to="/login" replace />;
+  }
+  // Si está autenticado, mostramos el componente que se quería renderizar
+  return children;
+}
+
+// ===================================================================
+// COMPONENTE PRINCIPAL DE LA APLICACIÓN
+// ===================================================================
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  
-  // 1. Añadimos un nuevo estado para saber si la verificación inicial ya terminó.
-  const [isLoading, setIsLoading] =  useState(true);
+  const [isLoading, setIsLoading] = useState(true);
+  const [showWarning, setShowWarning] = useState(false);
+  const navigate = useNavigate(); // Hook para la navegación
 
-  // 2. Usamos useEffect para que se ejecute solo una vez cuando la app carga.
+  const sessionTimeout = useRef();
+  const warningTimeout = useRef();
+
+  const handleLogout = useCallback(async () => {
+    clearTimeout(sessionTimeout.current);
+    clearTimeout(warningTimeout.current);
+    setShowWarning(false);
+    setIsAuthenticated(false);
+    try {
+      await fetch(`${API_BASE_URL}/api/v1/auth/logout`, { method: 'POST', credentials: 'include' });
+    } catch (error) {
+      console.error("Error en logout:", error);
+    }
+    navigate('/login'); // Redirigimos al login
+  }, [navigate]);
+
+  const setupTimers = (expiresAt) => {
+    clearTimeout(sessionTimeout.current);
+    clearTimeout(warningTimeout.current);
+
+    const timeLeft = expiresAt - Date.now();
+    const warningTime = timeLeft - 30 * 1000;
+
+    if (warningTime > 0) {
+      warningTimeout.current = setTimeout(() => setShowWarning(true), warningTime);
+    }
+    sessionTimeout.current = setTimeout(handleLogout, timeLeft);
+  };
+
+  const handleExtendSession = async () => {
+    setShowWarning(false);
+    try {
+      await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, { method: 'POST', credentials: 'include' });
+      const newExpiresAt = Date.now() + (3 * 60 * 1000);
+      setupTimers(newExpiresAt);
+    } catch (error) {
+      handleLogout();
+    }
+  };
+
+  const handleLoginSuccess = (expiresAt) => {
+    setIsAuthenticated(true);
+    setupTimers(expiresAt);
+    navigate('/conversor'); // Redirigimos al conversor
+  };
+
   useEffect(() => {
     const checkAuthStatus = async () => {
       try {
-        // 3. Intentamos llamar a nuestra nueva ruta de verificación.
-        const response = await fetch(`${API_BASE_URL}/api/v1/auth/verify`, {
-          credentials: 'include', // ¡Esencial para enviar la cookie!
-        });
-
-        // 4. Si la respuesta es OK (200), significa que la cookie es válida.
+        const response = await fetch(`${API_BASE_URL}/api/v1/auth/verify`, { credentials: 'include' });
         if (response.ok) {
-          setIsAuthenticated(true); // Marcamos al usuario como autenticado.
+          setIsAuthenticated(true);
+          // Opcional: Modificar /verify para que devuelva el expiresAt
+          // y llamar a setupTimers() aquí también para que el timer
+          // funcione incluso después de recargar la página.
         }
-        // Si no es OK (ej. 401), no hacemos nada, 'isAuthenticated' seguirá en false.
-
       } catch (error) {
-        // Si hay un error de red, asumimos que no está autenticado.
-        console.error("Error al verificar la autenticación:", error);
+        setIsAuthenticated(false);
       } finally {
-        // 5. Haya funcionado o no, la carga inicial ha terminado.
         setIsLoading(false);
       }
     };
-
     checkAuthStatus();
-  }, []); // El array vacío asegura que se ejecute solo una vez.
+  }, []);
 
-
-  const handleLoginSuccess = () => {
-    setIsAuthenticated(true);
-  };
-
- //-----------------INICIO DE LA MODIFICACIÓN ------------------
- //Se crea la función para manejar el cierre de sesión
-
- const handleLogout =() => {
-  setIsAuthenticated(false);
- }
-
-
-  // 6. Mientras estamos verificando, mostramos un mensaje de "Cargando...".
   if (isLoading) {
-    return <div>Verificando sesión...</div>;
+    return <div style={{ textAlign: 'center', marginTop: '50px' }}>Cargando aplicación...</div>;
   }
 
-  // 7. Una vez que la carga termina, usamos la misma lógica de antes.
   return (
     <>
-      {isAuthenticated ? (
-        <ExchangeConverter onLogout={handleLogout} />
-      ) : (
-        <Login onLoginSuccess={handleLoginSuccess} />
-      )}
+      {/* El modal de advertencia vive fuera del sistema de rutas para poder superponerse a todo */}
+      {showWarning && <WarningModal onExtend={handleExtendSession} onLogout={handleLogout} countdownStart={30} />}
+      
+      <Routes>
+        <Route
+          path="/login"
+          element={<Login onLoginSuccess={handleLoginSuccess} />}
+        />
+        
+        <Route
+          path="/conversor"
+          element={
+            <ProtectedRoute isAuthenticated={isAuthenticated}>
+              <ExchangeConverter onLogout={handleLogout} />
+            </ProtectedRoute>
+          }
+        />
+        
+        {/* Redirección por defecto */}
+        <Route
+          path="*"
+          element={<Navigate to="/conversor" replace />}
+        />
+      </Routes>
     </>
   );
 }

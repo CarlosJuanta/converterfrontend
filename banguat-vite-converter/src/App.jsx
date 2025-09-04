@@ -19,6 +19,19 @@ function ProtectedRoute({ isAuthenticated, children }) {
   // Si está autenticado, mostramos el componente que se quería renderizar
   return children;
 }
+ 
+// ===== INICIO DE LA MODIFICACIÓN #1 =====
+// Este es nuestro nuevo "Guardia" para rutas públicas
+function GuestRoute({ isAuthenticated, children }) {
+  if (isAuthenticated) {
+    // Si el usuario YA está autenticado, lo redirigimos a la página principal
+    return <Navigate to="/conversor" replace />;
+  }
+  // Si no está autenticado, le permitimos ver la página (Login, Register)
+  return children;
+}
+// ===== FIN DE LA MODIFICACIÓN #1 =====
+
 
 // ===================================================================
 // COMPONENTE PRINCIPAL DE LA APLICACIÓN
@@ -106,15 +119,27 @@ function App() {
       <Routes> 
 
 
-        <Route 
-         path ="/register"
-         element={<Register />}
-         />
-         
+       {/* ===== INICIO DE LA MODIFICACIÓN #2 ===== */}
+        {/* Ahora las rutas de login y registro están protegidas por GuestRoute */}
         <Route
           path="/login"
-          element={<Login onLoginSuccess={handleLoginSuccess} />}
+          element={
+            <GuestRoute isAuthenticated={isAuthenticated}>
+              <Login onLoginSuccess={handleLoginSuccess} />
+            </GuestRoute>
+          }
         />
+        
+        <Route
+          path="/register"
+          element={
+            <GuestRoute isAuthenticated={isAuthenticated}>
+              <Register />
+            </GuestRoute>
+          }
+        />
+        {/* ===== FIN DE LA MODIFICACIÓN #2 ===== */}
+        
         
         <Route
           path="/conversor"

@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Routes, Route, useNavigate, Navigate } from 'react-router-dom';
 import ExchangeConverter from './ExchangeConverter';
 import Login from './Login';
+import Register from './Register'; //importar nuevo componente
 import WarningModal from './WarningModal';
 import './App.css';
 
@@ -105,7 +106,14 @@ function App() {
       {/* El modal de advertencia vive fuera del sistema de rutas para poder superponerse a todo */}
       {showWarning && <WarningModal onExtend={handleExtendSession} onLogout={handleLogout} countdownStart={30} />}
       
-      <Routes>
+      <Routes> 
+
+
+        <Route 
+         path ="/register"
+         element={<Register />}
+         />
+         
         <Route
           path="/login"
           element={<Login onLoginSuccess={handleLoginSuccess} />}

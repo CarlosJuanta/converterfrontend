@@ -7,10 +7,7 @@ import Register from './Register'; //importar nuevo componente
 import WarningModal from './WarningModal';
 import './App.css';
 
-const API_BASE_URL = process.env.NODE_ENV === 'production'
-  ? 'https://conversor-jwt.onrender.com'
-  : 'http://localhost:3000';
-
+const API_BASE_URL = import.meta.env.VITE_API_URL;
 // ===================================================================
 // COMPONENTE "GUARDIA DE SEGURIDAD" PARA LAS RUTAS
 // ===================================================================
